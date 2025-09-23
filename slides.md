@@ -1,29 +1,17 @@
 ---
-# You can also start simply with 'default'
 theme: default
+layout: cover
+mdc: true
 
 title: Async to Distributed - Concurrency Patterns for Data Processing
 info: |
   Jakub Urban
 
-# apply unocss classes to the current slide
-# class: text-center
-# https://sli.dev/custom/highlighters.html
-highlighter: shiki
-# https://sli.dev/guide/drawing
-drawings:
-  persist: false
-# slide transition: https://sli.dev/guide/animations#slide-transitions
-transition: slide-left
-# enable MDC Syntax: https://sli.dev/guide/syntax#mdc-syntax
-mdc: true
-
-layout: cover
 
 ---
 
-# [Async to Distributed: Concurrency Patterns for Data Processing]{style="color:#9F0162"}
-## Jakub Urban *[@ Stealth]{style="color:#4D4DF4"}*
+# Async to Distributed: Concurrency Patterns for Data Processing
+## Jakub Urban *@ Stealth*
 
 ---
 layout: center
@@ -39,7 +27,7 @@ layout: center
 layout: section
 ---
 
-# [1. Introduction to concurrency and parallelism]{style="color:#9F0162"}
+# 1. Introduction to concurrency and parallelism
 
 
 ---
@@ -50,21 +38,22 @@ layout: two-cols-header
 
 ::left::
 
-- Concurrency enables you doing other things while waiting for results or other resources.
-  - For example, you can wait for multiple calculations or API responds.
+- Concurrency enables you to do other things while waiting for results or other resources.
+  - For example, you can wait for multiple calculations or API responses.
   - It's like a superpower of **waiting** in multiple queues at once.
-- You do not need to care how the work to clear a queue is done.
+- You do not need to care how the queue jobs are processed.
 
 ::right::
 
-::v-click
+<v-click>
 
-![Communist Czech queues](/communist_queues.png)
+![Communist Czech queues](./communist_queues.png)
 ([Foto: Archiv Ladislava Růžičky](https://magazin.aktualne.cz/nemame-zeptejte-se-po-novem-roce-nakupy-za-socialismu-v-cesk/r~49f5bc5a5eba11eebe29ac1f6b220ee8/))
 - Would be great for (Czech socialist) queues
   - Sometimes people even did not know what they were waiting for.
   - Wait in multiple queues at once would help.
-::
+
+</v-click>
 
 ---
 layout: two-cols-header
@@ -84,11 +73,11 @@ layout: two-cols-header
 
 ::right::
 
-::v-click
+<v-click>
 
-![Parallel sewing](/parallel_sewing.png)
+![Parallel sewing](./parallel_sewing.png)
 
-::
+</v-click>
 
 ---
 
@@ -102,7 +91,7 @@ layout: two-cols-header
 layout: section
 ---
 
-# [2. Python's built-in concurrency primitives]{style="color:#9F0162"}
+# 2. Python's built-in concurrency primitives
 
 ---
 
@@ -267,7 +256,7 @@ executor.shutdown(wait=True, cancel_futures=False)
 ```
 
 - `wait=True` blocks until all futures are completed and resources are freed.
-- `cancel_futures=False` cancels pending futures tha have not started running.
+- `cancel_futures=False` cancels pending futures that have not started running.
 
 - Lifetime can also be managed by a `with` block:
 
@@ -375,7 +364,7 @@ executor = loky.get_reusable_executor(max_workers=4, timeout=2)
 layout: section
 ---
 
-# [3. Scaling out: Distributed computing with Dask or Ray]{style="color:#9F0162"}
+# 3. Scaling out: Distributed computing with Dask or Ray
 
 ---
 layout: two-cols-header
@@ -397,19 +386,9 @@ layout: two-cols-header
 
 ::right::
 
-```mermaid
-graph TD;
-    subgraph Cluster
-        direction TB;
-        Scheduler[Scheduler]
-        Worker1[Worker 1]
-        Worker2[Worker 2]
-        Worker3[Worker 3]
-        Scheduler --> Worker1
-        Scheduler --> Worker2
-        Scheduler --> Worker3
-    end
-```
+<div style="display: flex; justify-content: center;">
+  <img src="./cluster.png" alt="Cluster diagram" style="width: 300px; max-width: 100%; max-height: 100%;" />
+</div>
 
 ---
 
@@ -485,13 +464,13 @@ dask_future = dask_client.submit(do_some_math, 10)
 executor = dask_client.get_executor()
 ```
 
-::v-click
+<v-click>
 - Need to decide whether to work with `Dask`,
   - and profit from its specific features,
 - or with `concurrent.futures` and `Dask` as a backend,
   - and profit from the `concurrent.futures` full compatibility, e.g. within `asyncio`.
 
-::
+</v-click>
 
 ---
 
@@ -506,89 +485,29 @@ result = await future
 
 ---
 
-# Dask manages distributed data
+# Dask vs concurrent.futures: practical upgrades
 
-- With `concurrent.futures`, data is pickled and sent to workers.
-  - This means data has to pass from / to the orchestrator.
-  - ... unless you use a distributed storage explicitly.
-- Dask primarily stores data in memory and schedules tasks close to data.
-  - Can also use distributed storage like HDFS, S3, or GCS.
-- Dask can explicitly send and persist data on workers.
-  - `scatter` or `persist` in Dask `Client`.
-- *References to data can be used as arguments to tasks*.
+<v-clicks>
 
----
+- **Distributed data & locality**
+  - Keep big data on workers with `scatter`/`persist`; schedule tasks where data live.
+  - Avoids shipping data through the driver for every task.
+- **First-class task dependencies**
+  - Pass futures as args to build DAGs; scheduler orders and streams results.
+- **Dynamic/nested tasks**
+  - Launch tasks from tasks safely via `worker_client` for recursive or fan-out work.
+- **Resilience**
+  - Automatic retries and recovery from some worker failures.
+- **Resource-aware placement**
+  - Tag tasks with resources (e.g., `{"GPU": 1}`) for correct scheduling.
 
-# Task dependencies - call graphs
-
-- Imagine a simple case of two dependent tasks:
-```python
-data = load_data()
-result = process_data(data)
-```
-
-- Passing references (`Future`'s) directly would not work with a `concurrent.futures` executor:
-```
-data_ref = executor.submit(load_data)
-result = executor.submit(process_data, data_ref)
-```
-
-- Raises a `TypeError` as `process_data` expects data, not a `Future` (which cannot be pickled).
-
-- **Sending futures / references as task argument works directly using Dask or Ray.**
-  - It's a very powerful feature for building complex task graphs.
-  - The data persistence described above is in fact just a special case of this feature.
+</v-clicks>
 
 ---
 
-# Nested tasks - avoiding locking
+# Dask Demo
 
-- Tasks in Dask can submit other tasks.
-- Dead-locking needs to be avoided, see [Launch Tasks from Tasks](https://distributed.dask.org/en/stable/task-launch.html).
-  - Can happen when a task submits another task but scheduler does not have any free worker slots.
-- Dask provides `worker_client` context manager for nested tasks:
-```python
-def fib(n):
-    if n < 2:
-        return n
-    with dask.distributed.worker_client() as client:
-        a_future = client.submit(fib, n - 1)
-        b_future = client.submit(fib, n - 2)
-        a, b = client.gather([a_future, b_future])
-    return a + b
-```
-
----
-
-# Fault tolerance
-
-- Software fails, hardware fails, networks fail, user (codes) fail.
-- Dask and Ray can recover from (some) failures.
-- Tasks can be retried automatically.
-  - With maximum number of retries explicitly specified.
-
-
----
-dragPos:
-  square: 56,852,150,150
----
-
-# Resource requests for task execution
-
-- Resource management is crucial in distributed computing.
-  - Not available in `concurrent.futures`.
-- Both Dask and Ray support requesting resources for tasks.
-  - Resources can be CPU, GPU, memory, or custom (abstract) resources.
-- Resource requests *do not* impose limits on actual physical resource usage.
-  - Scheduler uses requests for admission control and efficient scheduling.
-  - It's up to the task to not use more resources than requested.
-- CPU and memory are two fundamentally different types of resources:
-  - CPU: Can be "shared" (throttled) ➡️ cannot "run out of CPU".
-  - Memory: Finite capacity ➡️ can run out of memory ➡️ process OOM kill.
-- A Ray example:
-```python
-ref = process_data.options(num_cpus=2, memory=1024*1024*1024).remote(data_ref)
-```
+<<< @/snippets/dask_demo.py python {monaco}
 
 ---
 
@@ -605,5 +524,3 @@ ref = process_data.options(num_cpus=2, memory=1024*1024*1024).remote(data_ref)
 
 
 * Slides available at [https://github.com/coobas/pydata-prague-25].
-
-<img v-drag="'square'" src="/qrcode.png" width=150px>
