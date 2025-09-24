@@ -505,9 +505,9 @@ result = await future
 
 ---
 
-# Dask Demo
+# Dask Demo Time 🙀
 
-<<< @/snippets/dask_demo.py python {monaco}
+[snippets/dask_demo.py](./snippets/dask_demo.py)
 
 ---
 
@@ -516,11 +516,9 @@ result = await future
 * Python provides powerful built-in concurrency abstraction and implementation.
   * `concurrent.futures` is a high-level interface for asynchronous execution.
   * `Executor` and `Future` are the main abstractions that other frameworks build upon.
-  * can be seamlessly employed within `asyncio`
+  * Seamlessly employed within `asyncio`
 * Dask, Ray and similar provide enhanced features and scaling to distributed computing.
   * Improve pickling, data communication, task dependencies, resilience, resource management, and more.
   * Scale from single machine to large clusters.
-  * Integrate well with `asyncio`.
-
 
 * Slides available at [https://github.com/coobas/pydata-prague-25].
